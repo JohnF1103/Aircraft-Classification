@@ -34,3 +34,8 @@ test_transform = T.Compose(
 
 train_ds = Aircraft('./data/aircraft', train=True, download=True, transform=train_transform)
 test_ds = Aircraft('./data/aircraft', train=False, download=True, transform=test_transform)
+
+idx = 3068 # np.random.choice(N_test, 1)[0]
+print(test_ds.classes[test_ds[idx][1]])
+plt.imshow(test_ds[idx][0].permute(1,2,0))
+plt.show()
