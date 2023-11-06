@@ -1,8 +1,17 @@
 import numpy as np
+
+import gdown
+from PIL import Image
+
+
+
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+
 import matplotlib.pyplot as plt
 
 from  tqdm import tqdm
-
+from Model_class import Model
 import torch
 import torchvision
 import torchvision.transforms as T
@@ -11,6 +20,26 @@ from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 from data.aircraft import Aircraft
 from efficientnet_pytorch import EfficientNet
+
+
+
+def rand_bbox(size, lam):
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = np.int32(W * cut_rat)
+    cut_h = np.int32(H * cut_rat)
+
+    # uniform
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
 
 
 if __name__ == '__main__':
@@ -47,7 +76,7 @@ if __name__ == '__main__':
 
     batch_size = 20
     train_dl = torch.utils.data.DataLoader(train_ds, batch_size=batch_size,   
-                                        shuffle=True, num_workers=2, pin_memory=True)
+                                        shuffle=True, num_workers=2, pin_memory=True , drop_last=True)
     train_dl_iter = iter(train_dl)
 
 
@@ -64,4 +93,75 @@ if __name__ == '__main__':
     x = torch.rand((1,3,380,380))
 
     features = effnetb4.extract_features(x)
-    features.shape
+    print(features.shape)
+
+    print(effnetb4._fc.in_features)
+
+ 
+    model = Model(effnetb4)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+    model.load_state_dict(torch.load("fgvc-aircraft-30ep-cutmix.pth" , map_location=torch.device('cpu')))
+
+    model.eval()
+    torch.cuda.empty_cache()
+
+
+    #TESTING
+
+    test_img = Image.open("Cessna.jpg")
+
+    print (train_ds.classes)
+    
+    test_img_t = test_transform(test_img).unsqueeze(0).to(device)
+
+
+    print( test_img_t.shape)
+
+
+    pred = torch.exp(model(test_img_t))
+
+    pred_idx = torch.argmax(pred, dim=-1).item()
+    print("Classifier result = " , CLASSES[pred_idx])
+
+
+    output_class_tensor = pred[0][pred_idx]
+    output_class_tensor
+    # 그래디언트를 위한           종속변수               독립변수
+    grads = torch.autograd.grad(output_class_tensor, model.fmap) 
+
+    grad = grads[0]
+
+    # 위에서 구한 grad의 모양은 (1, 1792, 12, 12)
+    # 여기서 식빵 한장 (12,12)에 대해서 평균을 구해서 그래디언트 숫자를 1792개로 만든다.
+    # 배치들에 대해서도 다시 한번 평균을 구해야 하나 여기서는 입력이 1개라 그냥 스퀴즈
+    pooled_grads = torch.nn.AvgPool2d(grad.shape[2])(grad).squeeze()
+
+
+    # 최종 conv층의 각 채널에 그래디언트의 채널별 평균을 곱한다.
+    conv_layer_output = model.fmap[0]
+    conv_layer_output *= pooled_grads.reshape(1792, 1, -1)
+
+    heatmap = np.mean(conv_layer_output.cpu().detach().numpy(), axis=0)
+
+
+    heatmap = np.maximum(heatmap, 0) # ReLU 같은 부분
+    heatmap /= np.max(heatmap)       # 0~1로 노멀라이즈
+    
+
+    width, height = test_img.size
+    test_img = test_img.convert('RGBA')
+    # print(img.mode)
+
+    cm = plt.get_cmap('jet')
+    heatmap2 = Image.fromarray(np.uint8(cm(heatmap)*255))
+    heatmap2 = heatmap2.resize((width, height), Image.Resampling.LANCZOS)
+    #print(heatmap2.mode)
+
+    superimposed_img = Image.blend(test_img, heatmap2, alpha=0.3)
+    plt.imshow(superimposed_img)
+
+
+    plt.show()
