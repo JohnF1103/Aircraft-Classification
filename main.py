@@ -84,9 +84,6 @@ if __name__ == '__main__':
 
     mini_batch, labels = next(train_dl_iter)
 
-    # 노멀라이즈 전으로 돌린 다음 64개만 잘라온다.
-    # mini_batch = (mini_batch * stds_tns + means_tns)[:64]
-
    
     effnetb4 = EfficientNet.from_pretrained('efficientnet-b4')
     EfficientNet.get_image_size('efficientnet-b4')
@@ -111,7 +108,7 @@ if __name__ == '__main__':
 
     #TESTING
 
-    test_img = Image.open("Cessna.jpg")
+    test_img = Image.open("IMG_7724.jpg")
 
     print (train_ds.classes)
     
@@ -129,26 +126,21 @@ if __name__ == '__main__':
 
     output_class_tensor = pred[0][pred_idx]
     output_class_tensor
-    # 그래디언트를 위한           종속변수               독립변수
     grads = torch.autograd.grad(output_class_tensor, model.fmap) 
 
     grad = grads[0]
 
-    # 위에서 구한 grad의 모양은 (1, 1792, 12, 12)
-    # 여기서 식빵 한장 (12,12)에 대해서 평균을 구해서 그래디언트 숫자를 1792개로 만든다.
-    # 배치들에 대해서도 다시 한번 평균을 구해야 하나 여기서는 입력이 1개라 그냥 스퀴즈
     pooled_grads = torch.nn.AvgPool2d(grad.shape[2])(grad).squeeze()
 
 
-    # 최종 conv층의 각 채널에 그래디언트의 채널별 평균을 곱한다.
     conv_layer_output = model.fmap[0]
     conv_layer_output *= pooled_grads.reshape(1792, 1, -1)
 
     heatmap = np.mean(conv_layer_output.cpu().detach().numpy(), axis=0)
 
 
-    heatmap = np.maximum(heatmap, 0) # ReLU 같은 부분
-    heatmap /= np.max(heatmap)       # 0~1로 노멀라이즈
+    heatmap = np.maximum(heatmap, 0) # ReLU 
+    heatmap /= np.max(heatmap)       
     
 
     width, height = test_img.size
