@@ -23,7 +23,7 @@ from efficientnet_pytorch import EfficientNet
 
 
 
-def rand_bbox(size, lam):
+"""def rand_bbox(size, lam):
     W = size[2]
     H = size[3]
     cut_rat = np.sqrt(1. - lam)
@@ -40,7 +40,7 @@ def rand_bbox(size, lam):
     bby2 = np.clip(cy + cut_h // 2, 0, H)
 
     return bbx1, bby1, bbx2, bby2
-
+"""
 
 if __name__ == '__main__':
     IMG_SIZE = 380
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     #TESTING
 
-    test_img = Image.open("IMG_7724.jpg")
+    test_img = Image.open("f-18.jpg")
 
     print (train_ds.classes)
     
