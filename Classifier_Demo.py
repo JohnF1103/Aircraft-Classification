@@ -14,6 +14,8 @@ from efficientnet_pytorch import EfficientNet
 from Model_class import Model
 
 import torch.nn.functional as nnf
+import customtkinter
+
 
 IMG_SIZE = 380
 
@@ -92,7 +94,6 @@ def classify():
     print( test_img_t.shape)
 
 
-    
     pred = torch.exp(model(test_img_t))
 
 
@@ -101,14 +102,17 @@ def classify():
     max_prob, predicted_class = torch.max(pred, 1)
 
     # Print the confidence (probability) of the model's prediction
-    print("Confidence:", max_prob.item())
 
     pred_idx = torch.argmax(pred, dim=-1).item()
 
-    
-    
+
+    confidence_value = int(max_prob.item() * 100)
+
+   
 
     result_label.config(text=f"Classifier Result: {CLASSES[pred_idx]}", fg="green",font=("Arial", 14))
+    confidence_label.config(text=f"Confidence: {confidence_value}%", fg="green" if confidence_value > 70 else "yellow" if 45 <= confidence_value <= 70 else "red", font=("Arial", 14))
+
     makeHeatMap(pred,pred_idx, test_img)
 
 def makeHeatMap(pred, pred_idx, img):
@@ -159,6 +163,7 @@ def open_file_dialog():
     if file_path:
         selected_file_label.config(text=f"Selected File: {file_path}")
         result_label.config(text="")
+        confidence_label.config(text="")
         process_file(file_path)
 
 def process_file(file_path):
@@ -172,7 +177,13 @@ def process_file(file_path):
         selected_file_label.config(text=f"Error: {str(e)}")
 
 root = tk.Tk()
-root.title("File Dialog Example")
+
+
+
+
+root.title("Classifier")
+root.geometry("500x500")
+
 
 open_button = tk.Button(root, text="Open File", command=open_file_dialog)
 open_button.pack(padx=20, pady=20, anchor='w')
@@ -185,6 +196,9 @@ selected_file_label.pack()
 
 result_label = tk.Label(root, text="Classifier result:")
 result_label.pack()
+
+confidence_label = tk.Label(root, text="Confidence:")
+confidence_label.pack()
 
 classify_button = tk.Button(root, text="Classify", command=classify)
 classify_button.pack(padx=20, pady=20, anchor='w')
